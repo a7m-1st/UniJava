@@ -1,27 +1,24 @@
 package Assn;
 //note: add number of jobs killed & completed
 //average cpus used
-//average excecution time
-//average number of jobs submitted & ended within time
-//number of jobs causing errors & user
 
-/*
+/* to Add:
+-give months, gives average jobs
+
 Progress:
 -Two main hashmaps present
 --mapOfList contains all the lines numbered sequentially
 --LineToIdMap 1 & 2 contains the Line number to JobId (JobId as key)
 */
 import com.sun.security.jgss.GSSUtil;
+import org.w3c.dom.ls.LSOutput;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.lang.reflect.Array;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Objects;
-import java.util.Scanner;
-
+import java.util.*;
 
 
 public class Assign {
@@ -30,11 +27,16 @@ public class Assign {
     //Line to id map
     static HashMap<String, Integer> lineToIdMap = new HashMap<>(); //first occurrence
     static HashMap<String, Integer> lineToIdMap2 = new HashMap<>(); //last occurrence
-    static int lineNum=0;
+    static ArrayList<Double> avgTimes = new ArrayList<>(); //contains the time excecution
+    static int lineNum=0; static boolean gate = true;
 
     public static void main(String[] args) {
+        Scanner in = new Scanner(System.in); Scanner in2 = new Scanner(System.in);
         String filename = "C:\\Users\\A7M1ST\\Downloads\\extracted_log.txt";
         String line, jobId;
+
+        System.out.print("Please choose whether you want to display the errors- 1 for yes");
+        boolean choose = in.nextInt() == 1;
 
         //initialize lines & jobid to hashmaps
         try {
@@ -50,28 +52,84 @@ public class Assign {
                     lineToIdMap.putIfAbsent(jobId, lineNum); //First occurance of id
                     lineToIdMap2.put(jobId, lineNum);    //last occurance of id
                 }
+
+                if(choose) numberOfErrors(line); //ERRORS
             }
 
             file.close();
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
         }
+        if(choose) System.out.println("Total jobs with errors: " + count + "\n");
 
+        int c = 0;
+        //replace with -49 the starting errors
+        for(var x: lineToIdMap.entrySet()) {
+            String lineCheck = mapOfList.get(x.getValue()); //links value to line efficiently
+            String[] arr2 = lineCheck.split(" "); //split the array
+            if(!(Objects.equals(arr2[1],"_slurm_rpc_submit_batch_job:") || Objects.equals(arr2[1],"sched:"))) {
+                lineToIdMap.put(x.getKey(), -49); //removes the line incomplete start data
+                //System.out.println(x.getKey());//debug
+                c++; //counter of end only lines
+            }
+        }
+        System.out.println("Num of Jobs which ended but started before timeline: (including errors)"+ c);
+        //System.out.println(lineToIdMap);
+
+        int c2 = 0, kill = 0, complete =0;
+        //replace with -49 the *ending* errors
+        for(var x: lineToIdMap2.entrySet()) {
+            String lineCheck = mapOfList.get(x.getValue()); //links value to line efficiently
+            String[] arr2 = lineCheck.split(" "); //split the array
+            if((Objects.equals(arr2[1],"_slurm_rpc_submit_batch_job:") || Objects.equals(arr2[1],"sched:"))) {
+                //System.out.println(mapOfList.get(x.getValue()));//debug
+                lineToIdMap2.put(x.getKey(), -49); //replace the line number to -49 so cannot be found
+                c2++; //counter of end only lines
+            }
+            if(Objects.equals(arr2[1],"_slurm_rpc_kill_job:")) kill++;
+            if(Objects.equals(arr2[1],"_job_complete:")) complete++;
+        }
+        System.out.println("Num of Jobs which started but ended after timeline: (excluding errors)"+ c2);
+        System.out.println("Num of Jobs completed succesfully: " + complete);
+        System.out.println("Num of Jobs killed " + kill);
 
         System.out.println("There is " + lineToIdMap.size() + " jobIds");
         System.out.println("There is " + lineNum + " lines");
+
+        //fill up the times array with time for excecution
+        if(gate) for(var x: lineToIdMap.keySet()) {
+            idStartEnd(x);
+        }
+        gate = false;
+        System.out.printf("Average excecution time is %.2f seconds, %.2f minutes, %.2f hours\n", avg(), avg()/60, avg()/3600);
+        System.out.printf("Max time is %.2f seconds = %.2f days\n", Collections.max(avgTimes), Collections.max(avgTimes)/3600/24);
+        System.out.printf("Min time is %.2f seconds \n", Collections.min(avgTimes));
+
+        System.out.println("*************");
+        searchInfo("Partition=cpu", "-epyc", "-opteron"); //search partition info
+        System.out.println();
+        searchInfo("Partition=gpu","-v100s", "-k40c", "-titan", "-k10"); //search partition info
+
         System.out.println("Fetching Complete!\n");
 
-        idStartEnd("42834");
-
-        searchInfo("Partition=cpu", "-epyc", "-opteron"); //search partition info
-        searchInfo("Partition=gpu","-v100s", "-k40c", "-titan", "-k10"); //search partition info
-        getTime("[2022-06-01T01:02:35.148]", "[2022-06-01T08:55:12.708]");
-
-        for(var x: lineToIdMap.entrySet()) {
-
-
+        //enter jobid to get searched
+        while(true) {
+            System.out.print("Please enter jobId to get searched; -1 to continue to time segments");
+            int searched = in.nextInt();
+            if(searched == -1) break;
+            idStartEnd(Integer.toString(searched));
         }
+
+        //enter times to get searched
+        while(true) {
+            System.out.print("Please enter start time; -1 to quit:");
+            String searched1 = in2.nextLine();
+            if(Objects.equals(searched1, "-1")) break;
+            System.out.print("Please enter end time:");
+            String searched2 = in2.nextLine();
+            getTime(searched1, searched2); //times
+        }
+
     }
 
 
@@ -133,33 +191,34 @@ public class Assign {
         String firstLine = mapOfList.get(firstOcc);
         String lastLine = mapOfList.get(lastOcc);
 
-            System.out.println("*************");
-        System.out.println("Info of " + id);
-        System.out.printf("Start of is %s \nEnd is %s \n", firstOcc, lastOcc);
-        System.out.println("Number of lines interval: " + (lastOcc - firstOcc));
+        if (firstLine != null && lastLine != null) { //as long as "null" is not recieved
+            //Finding time:::
+            //time1 =  [2022-06-01T01:02:35.148]
+            //time2 =  [2022-06-01T09:11:17.689]
+            String[] firstSplit = firstLine.split(" ");
+            String time1 = firstSplit[0];
 
-        System.out.println("\nStart: " + firstLine);
-        System.out.println("End: " + lastLine);
+            String[] lastSplit = lastLine.split(" ");
+            String time2 = lastSplit[0];
+            if(!gate) {
+                System.out.println("*************");
+                System.out.println("Info of " + id);
+                System.out.printf("Start of is %s \nEnd is %s \n", firstOcc, lastOcc);
+                System.out.println("Number of lines interval: " + (lastOcc - firstOcc));
 
+                System.out.println("\nStart: " + firstLine);
+                System.out.println("End: " + lastLine);
+                System.out.println();
+            }
 
-        //Finding time:::
-        //time1 =  [2022-06-01T01:02:35.148]
-        //time2 =  [2022-06-01T09:11:17.689]
-
-        String[] firstSplit = firstLine.split(" ");
-        String time1 = firstSplit[0];
-
-        String[] lastSplit = lastLine.split(" ");
-        String time2 = lastSplit[0];
-
-        getTime(time1, time2);
+            getTime(time1, time2);
+        } else if(!gate) System.out.println("JobId not found, Please try again");
     }
 
     //Searches then counts what ever value inputted
-    //output= number of values
+    //output= //gets PARTITIONS
     //Takes maximum 5 values to be searched within search
     public static void searchInfo(String searched, String ... v) {
-        System.out.println("*************");
         int counter = 0,a=0, b=0, c=0, d=0, e=0;
         String found;
 
@@ -190,67 +249,101 @@ public class Assign {
 
     }
 
+    //Gets time diff AND number of jobs submitted & ended between two times
+    //return long in order to calculate average time taken
     public static void getTime(String timeA, String timeB) {
         //timeA =  [2022-06-01T01:02:35.148]
         //timeB =  [2022-06-01T09:11:17.689]
 
         //timeA get date & time
-        String date = timeA.substring(1, 11);
-        String time = timeA.substring(12, 24); //09:11:17
-        String dateStart = date + " " + time; //convert to compatible format
-
-        //timeB get date & time
-        date = timeB.substring(1, 11);  //2022-06-01
-        time = timeB.substring(12, 24); //09:11:17
-        String dateStop = date + " " + time;
-
-        // Custom date format
-        SimpleDateFormat format = new SimpleDateFormat("yy-MM-dd HH:mm:ss");
-
-        Date d1 = null;
-        Date d2 = null;
         try {
-            d1 = format.parse(dateStart);
-            d2 = format.parse(dateStop);
-        } catch (ParseException e) {
-            e.printStackTrace();
-        }
+            String date = timeA.substring(1, 11);
+            String time = timeA.substring(12, 24); //09:11:17
+            String dateStart = date + " " + time; //convert to compatible format
 
-    // Get msec from each, and subtract.
-        assert d2 != null;
-        long diff = d2.getTime() - d1.getTime();
-        long diffSeconds = diff / 1000;
-        long diffMinutes = diff / (60 * 1000);
-        long diffHours = diff / (60 * 60 * 1000);
+            //timeB get date & time
+            date = timeB.substring(1, 11);  //2022-06-01
+            time = timeB.substring(12, 24); //09:11:17
+            String dateStop = date + " " + time;
 
-        System.out.println("*************");
-        System.out.println("Time in seconds: " + diffSeconds + " seconds.");
-        System.out.println("Time in minutes: " + diffMinutes + " minutes.");
-        System.out.println("Time in hours: " + diffHours + " hours.");
+            // Custom date format
+            SimpleDateFormat format = new SimpleDateFormat("yy-MM-dd HH:mm:ss");
 
-
-        //Calculate the in between
-        int firstLineNum=0, lastLineNum=0;
-        //find lineNum of timeA & timeB
-        for(int i=1; i<=lineNum; i++) {
-            String[] arr = mapOfList.get(i).split(" "); //contains the date as arr[0]
-            if(timeA.equals(arr[0])) firstLineNum = i;
-            if(timeB.equals(arr[0])) { //if first & last line is found; break
-                lastLineNum = i;
-                break;
-            }
-        }
-
-        int jobsCounter=0;
-        //jobs started between the line numbers
-        for(int i=firstLineNum; i<lastLineNum; i++)
-            if(lineToIdMap.containsValue(i)) {
-                System.out.println(mapOfList.get(i));
-                jobsCounter++;
+            Date d1 = null;
+            Date d2 = null;
+            try {
+                d1 = format.parse(dateStart);
+                d2 = format.parse(dateStop);
+            } catch (ParseException e) {
+                e.printStackTrace();
             }
 
+         // Get msec from each, and subtract.
+            assert d2 != null;
+            double diff = d2.getTime() - d1.getTime();
+            double diffSeconds = diff / 1000;
+            double diffMinutes = diff / (60 * 1000);
+            double diffHours = diff / (60 * 60 * 1000);
 
-        System.out.println("Jobs submitted between line " + firstLineNum + " & " + lastLineNum + ": " + jobsCounter);
+            if(!gate) {
+                System.out.printf("Time in seconds: %.2f seconds.\n", diffSeconds);
+                System.out.printf("Time in minutes: %.2f minutes.\n", diffMinutes);
+                System.out.printf("Time in hours: %.2f hours.\n", diffHours);
 
+
+                //Calculate the in between
+                int firstLineNum = 0, lastLineNum = 0;
+                //find lineNum of timeA & timeB
+                for (int i = 1; i <= lineNum; i++) {
+                    String[] arr = mapOfList.get(i).split(" "); //contains the date as arr[0]
+                    if (timeA.equals(arr[0])) firstLineNum = i;
+                    if (timeB.equals(arr[0])) { //if first & last line is found; break
+                        lastLineNum = i;
+                        break;
+                    }
+                }
+
+                int jobsCounter = 0, jobsCounterEnd = 0;
+                //jobs started between the line numbers
+                for (int i = firstLineNum; i < lastLineNum; i++) //go through each line number
+                    if (lineToIdMap.containsValue(i)) {
+                        //System.out.println(mapOfList.get(i)); //debug
+                        jobsCounter++;
+                    }
+
+
+                System.out.println("Jobs submitted between the time is: " + jobsCounter);
+
+                for (int i = firstLineNum; i < lastLineNum; i++)
+                    if (lineToIdMap2.containsValue(i)) {
+                        //System.out.println(mapOfList.get(i)); //debug
+                        jobsCounterEnd++;
+                    }
+                System.out.println("Jobs ended between the time is: " + jobsCounterEnd);
+                System.out.println("*************");
+            }
+
+
+            avgTimes.add(diffSeconds);
+        } catch(StringIndexOutOfBoundsException e) {
+            System.out.println("Please Enter Correct Time");
+        }
+    }
+
+    static int count = 0;
+    public static void numberOfErrors(String line) {
+        String[] arr = line.split(" ");
+        if(arr[1].equals("error:")) {
+            if(!getSearched(line, "user=").equals("NAN"))
+             System.out.println("Error with username " + getSearched(line, "user=") + " at line " + lineNum);
+            count++;
+        }
+
+    }
+
+    public static float avg() {
+        float S = 0;
+        for(var x: avgTimes) S += x;
+        return S / avgTimes.size();
     }
 }
