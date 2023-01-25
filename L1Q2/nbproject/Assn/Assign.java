@@ -19,6 +19,10 @@ import java.lang.reflect.Array;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import Swift.*;
+import Assn.*;
+
+import javax.swing.*;
 
 
 public class Assign {
@@ -29,8 +33,11 @@ public class Assign {
     static HashMap<String, Integer> lineToIdMap2 = new HashMap<>(); //last occurrence
     static ArrayList<Double> avgTimes = new ArrayList<>(); //contains the time excecution
     static int lineNum=0; static boolean gate = true;
+    static JFrame frame; static graph fun;
 
     public static void main(String[] args) {
+        fun = new graph();
+        frame = new JFrame();
         Scanner in = new Scanner(System.in); Scanner in2 = new Scanner(System.in);
         String filename = "C:\\Users\\A7M1ST\\Downloads\\extracted_log.txt";
         String line, jobId;
@@ -61,6 +68,9 @@ public class Assign {
             throw new RuntimeException(e);
         }
         if(choose) System.out.println("Total jobs with errors: " + count + "\n");
+        panelCreator2.scale = 15000;
+        System.out.println("Scale of graph set to " + panelCreator2.scale); //set scale to line Numbers
+
 
         int c = 0;
         //replace with -49 the starting errors
@@ -73,7 +83,8 @@ public class Assign {
                 c++; //counter of end only lines
             }
         }
-        System.out.println("Num of Jobs which ended but started before timeline: (including errors)"+ c);
+        System.out.println("Num of Jobs which ended but started before timeline: (including errors) " + panelCreator2.clr[panelCreator2.i]+ c);
+        fun.createPanel(c, frame);
         //System.out.println(lineToIdMap);
 
         int c2 = 0, kill = 0, complete =0;
@@ -89,9 +100,14 @@ public class Assign {
             if(Objects.equals(arr2[1],"_slurm_rpc_kill_job:")) kill++;
             if(Objects.equals(arr2[1],"_job_complete:")) complete++;
         }
-        System.out.println("Num of Jobs which started but ended after timeline: (excluding errors)"+ c2);
-        System.out.println("Num of Jobs completed succesfully: " + complete);
-        System.out.println("Num of Jobs killed " + kill);
+        System.out.println("Num of Jobs which started but ended after timeline: (excluding errors) in " + panelCreator2.clr[panelCreator2.i]+ c2);
+        fun.createPanel(c2, frame);
+
+        System.out.println("Num of Jobs completed succesfully: in " + panelCreator2.clr[panelCreator2.i] + complete);
+        fun.createPanel(complete, frame);
+
+        System.out.println("Num of Jobs killed in " + panelCreator2.clr[panelCreator2.i] + kill);
+        fun.createPanel(kill, frame);
 
         System.out.println("There is " + lineToIdMap.size() + " jobIds");
         System.out.println("There is " + lineNum + " lines");
@@ -101,7 +117,8 @@ public class Assign {
             idStartEnd(x);
         }
         gate = false;
-        System.out.printf("Average excecution time is %.2f seconds, %.2f minutes, %.2f hours\n", avg(), avg()/60, avg()/3600);
+        System.out.printf("Average excecution time is %.2f seconds, %.2f minutes, %.2f hours in %s\n", avg(), avg()/60, avg()/3600, panelCreator2.clr[panelCreator2.i]);
+        fun.createPanel((int) avg()/3600, frame);
         System.out.printf("Max time is %.2f seconds = %.2f days\n", Collections.max(avgTimes), Collections.max(avgTimes)/3600/24);
         System.out.printf("Min time is %.2f seconds \n", Collections.min(avgTimes));
 
@@ -240,11 +257,16 @@ public class Assign {
 
         System.out.println("Number of " + searched + " is " + counter);
         try {
-            System.out.println("Number of " + v[0] + " users is " + a);
-            System.out.println("Number of " + v[1] + " users is " + b);
-            System.out.println("Number of " + v[2] + " users is " + c);
-            System.out.println("Number of " + v[3] + " users is " + d);
-            System.out.println("Number of " + v[4] + " users is " + e);
+            System.out.println("Number of " + v[0] + " users is (in " + panelCreator2.clr[panelCreator2.i] + ") " + a);
+            fun.createPanel(a, frame);
+            System.out.println("Number of " + v[1] + " users is (in " + panelCreator2.clr[panelCreator2.i] + ") " + b);
+            fun.createPanel(b, frame);
+            System.out.println("Number of " + v[2] + " users is (in " + panelCreator2.clr[panelCreator2.i] + ") " + c);
+            fun.createPanel(c, frame);
+            System.out.println("Number of " + v[3] + " users is (in " + panelCreator2.clr[panelCreator2.i] + ") " + d);
+            fun.createPanel(d, frame);
+            System.out.println("Number of " + v[4] + " users is (in " + panelCreator2.clr[panelCreator2.i] + ") " + e);
+            fun.createPanel(e, frame);
         } catch(ArrayIndexOutOfBoundsException ignored) {}
 
     }
